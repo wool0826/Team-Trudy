@@ -324,7 +324,7 @@ def hideInformation(fname, shares, output):
     
     dataValue,x,y,c = getDataFromImage(img, dataSize, x,y,c)
 
-    print('retrieved Data : %s\n' % dataValue)
+    #print('retrieved Data : %s\n' % dataValue)
 
     return 0
 
@@ -344,10 +344,13 @@ if __name__ == '__main__':
     """바꾼 key값을 이용하여 N of K 의 keySharing을 수행한다."""
     shares = getSharingKey(tempkey, N, K)
 
+    print('sharing key', end=' ')
+    print(shares)
+
     """sharing 복호화? 의 경우에서 코드"""
-    #recoverdKey = recoverSharingKey(shares[1:4])
-    #print("key: %s" % key)
-    #print("key: %s" % recoverdKey)
+    recoverdKey = recoverSharingKey(shares[1:4])
+    print('original key : %s' % key)
+    print("recovered key: %s\n" % recoverdKey)
 
     """HIDING INFORMATION"""
     hideInformation("sample.jpg", shares, output)
