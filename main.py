@@ -30,14 +30,204 @@ from Crypto import Random
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5 import uic
+from PyQt5.QtCore import *
 
 form_class = uic.loadUiType("Trudy 2019.ui")[0]
+
+
 
 class MyWindow(QMainWindow, form_class):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
         self.visible = True
+
+        # 버튼 세팅
+        self.edit_text_path.clicked.connect(self.edit_text_path_btn_clicked)
+        self.edit_image_path.clicked.connect(self.edit_image_path_btn_clicked)
+        self.crypto_button.clicked.connect(self.crypto_start)
+        self.open_filefolder.clicked.connect(self.open_filefolder_btn_clicked)
+
+        self.edit_folder_path.clicked.connect(self.edit_folder_path_btn_clicked)
+        self.encrypto_button.clicked.connect(self.encrypto_start)
+
+
+    def edit_text_path_btn_clicked(self):
+        defaultPath = self.crypto_text_path.text()
+
+        if(defaultPath is ''):
+            fname = QFileDialog.getOpenFileName(self,"텍스트 파일을 선택해주세요." , filter =  "TextFile(*.txt)")
+        else :
+            fname = QFileDialog.getOpenFileName(self,"텍스트 파일을 선택해주세요.",defaultPath, "TextFile(*.txt)")
+
+        if(fname[0] is not ''):
+            self.crypto_text_path.setText(fname[0])
+
+        try:
+            if (fname[0] is ''):
+                return
+            file = open(fname[0])
+            self.plaintext.setText(''.join(file.readlines()))
+        except Exception:
+            self.handle_error("텍스트 호출 과정에서 문제가 발생했습니다.")
+            return
+
+
+    def edit_image_path_btn_clicked(self):
+        defaultPath = self.crypto_image_path.text()
+
+        if (defaultPath is ''):
+            fname = QFileDialog.getOpenFileName(self, "이미지를 선택해주세요." , filter =  "Images(*.png)")
+        else:
+            fname = QFileDialog.getOpenFileName(self, "이미지를 선택해주세요." , defaultPath, "Images(*.png)")
+
+
+        try:
+            if (fname[0] is ''):
+                return
+
+
+            width = 781
+            height = 361
+
+            self.image.clear()
+            self.image = QLabel(self.image)
+            self.image.setFixedSize(width, height)
+            self.image.setAlignment(Qt.AlignCenter)
+
+            pixmap = QPixmap(fname[0])
+            pwidth = pixmap.width()
+            pheight = pixmap.height()
+
+            ratio = width / height
+            pratio = pwidth / pheight
+
+            if ratio < pratio:
+                scaledPixmap = pixmap.scaled(width, width*pratio)
+            else:
+                scaledPixmap = pixmap.scaled(height*pratio, height)
+
+            self.image.setPixmap(scaledPixmap)
+            self.image.show()
+        except:
+            self.handle_error('이미지를 불러올 수 없습니다.')
+
+        if(fname[0] is not ''):
+            self.crypto_image_path.setText(fname[0])
+
+
+    # 폴더 패스 설정
+    def edit_folder_path_btn_clicked(self):
+        defaultPath = self.chiper_image_folder.text()
+
+        if(defaultPath is ''):
+            fname = QFileDialog.getExistingDirectory(self, "이미지 폴더를 선택해주세요." )
+        else :
+            fname = QFileDialog.getExistingDirectory(self, "이미지 폴더를 선택해주세요.", defaultPath)
+
+        if(fname is not ''):
+            self.chiper_image_folder.setText(fname)
+
+    def open_filefolder_btn_clicked(self):
+        cwd = os.getcwd()
+        os.startfile(cwd)
+
+    def handle_error(self, error):
+        QMessageBox.about(self, '치명적인 에러', error)
+
+
+    def crypto_check(self):
+        n = self.n.value()
+        k = self.k.value()
+
+        defaultFilePath = self.crypto_text_path.text()
+        defaultImagePath = self.crypto_image_path.text()
+
+        msg = ''
+        try:
+            if n <= 0:
+                msg = 'n은 0보다 큰 수여야 합니다.'
+                raise Exception
+            elif k <= 0:
+                msg = 'k는 0보다 큰 수여야 합니다.'
+                raise Exception
+            elif n < k:
+                msg = 'k는 n보다 클 수 없습니다.'
+                raise Exception
+
+            try:
+                text = open(defaultFilePath)
+                text.close()
+            except FileNotFoundError:
+                msg = 'Text 파일을 찾을 수 없습니다.'
+                raise Exception
+
+            if not defaultFilePath.endswith('.txt'):
+                msg = ".txt 파일이 아닙니다."
+                raise Exception
+
+            try:
+                text = open(defaultImagePath)
+                text.close()
+            except FileNotFoundError:
+                msg = '이미지를 찾을 수 없습니다.'
+                raise Exception
+
+            if not defaultFilePath.endswith('.txt'):
+                msg = ".png 파일이 아닙니다."
+                raise Exception
+
+        except Exception as error:
+            self.handle_error(msg)
+            return False, 0, 0, 0, 0
+
+        return True, n, k, defaultFilePath, defaultImagePath
+
+
+
+    def crypto_start(self):
+
+        check, n, k, defaultFilePath, defaultImagePath = self.crypto_check()
+
+        # 체크를 통과하지 못한경우 종료
+        if not check:
+            #여기 프로그래스 바 세팅
+            return
+
+        try:
+            steganoGraphy(defaultFilePath, defaultImagePath, n, k)
+        except Exception:
+            self.handle_error("키쉐어링 암호화 과정에서 문제가 발생했습니다.")
+            return
+
+    def encrypto_check(self):
+
+        defaultFolderPath = self.chiper_image_folder.text()
+        #에러 체크가 필요한 부분
+        return True, defaultFolderPath
+
+
+    def encrypto_start(self):
+
+        check, folderpath = self.encrypto_check()
+
+        # 체크를 통과하지 못한경우 종료
+        if not check:
+            #여기 프로그래스 바 세팅
+            return
+
+        try:
+            getInformation(folderpath)
+        except Exception:
+            self.handle_error("복호화 과정에서 문제가 발생했습니다.")
+            return
+
+        try:
+            file = open("recovered_output.txt")
+            self.plain_text.setText(''.join(file.readlines()))
+        except Exception:
+            self.handle_error("복호화 텍스트 호출 과정에서 문제가 발생했습니다.")
+            return
 
 
 # Crypto Functions
@@ -60,6 +250,7 @@ def makeEncryptFile(in_fname):
     # 반환값은 키값과 output 데이터
     return key, result
 
+
 # key           복호화에 이용할 키
 # in_filename   cipherText에 해당하는 파일의 경로
 # out_filename  plainText에 해당하는 파일의 경로
@@ -70,13 +261,11 @@ def decrypt_file(key, iv, in_filename, structLen, out_filename):
     # 복호화는 CBC모드.
     decryptor = AES.new(key, AES.MODE_CBC, iv)
     result = decryptor.decrypt(in_filename)
-    print(structLen)
-    print(result, len(result))
-    print(result[:structLen])
 
     # 파일을 열어서 해독한 내용중 padding된 부분을 제외한 구조길이,structLen만큼만 slicing해서 넣어준다.
     with open(out_filename, 'wb') as outfile:
         outfile.write(result[:structLen])
+
 
 # key           암호화에 이용할 키
 # in_filename   plainText에 해당하는 파일의 경로
@@ -95,9 +284,6 @@ def encrypt_file(key, in_filename, out_filename=None, chunksize=65536):
     iv = Random.new().read(AES.block_size)
     encryptor = AES.new(key, AES.MODE_CBC, iv)
     filesize = os.path.getsize(in_filename)
-
-    print('original iv: %s' % iv)
-    print('original struct: %s\n' % struct.pack('<Q', filesize))
 
     with open(in_filename, 'rb') as infile:
         with open(out_filename, 'wb') as outfile:
@@ -297,6 +483,7 @@ def countBitLength(share, output):
 
     return shareLength, structSize, ivSize, dataSize
 
+
 # fname     스테가노그래피에 이용할 원본 이미지의 경로
 # shares    여기서는 1개의 sharingKey만 쓰게 했으나 고치게 될 것으로 보임
 # output    cipherText에 해당하는 값
@@ -315,7 +502,8 @@ def hideInformation(fname, shares, output):
         shareArr.append(share.encode())
         insertDataIntoImage(img, shareArr, shareLength, px, py, pc)  # write keySharing Data
 
-        cv2.imwrite("image" + str(n) + ".png", img)
+        cv2.imwrite("./files/image" + str(n) + ".png", img)
+
 
 def findInformation(input_images):
     structSize = 64
@@ -332,7 +520,7 @@ def findInformation(input_images):
 
         structValue, x, y, c = getDataFromImage(img, structSize, x, y, c)
         ivValue, x, y, c = getDataFromImage(img, ivSize, x, y, c)
-        
+
         dataValue, x, y, c = getDataFromImage(img, dataSize, x, y, c)
         shareValue, x, y, c = getDataFromImage(img, shareSize, x, y, c)
 
@@ -341,51 +529,52 @@ def findInformation(input_images):
 
     return sharelist, dataValue, ivValue, structLen
 
+
 def steganoGraphy(input_file, input_image, n, k):
     key, output = makeEncryptFile(input_file)
-    tempkey = makeKeyToAscii(key)
 
+    tempkey = makeKeyToAscii(key)
     shares = getSharingKey(tempkey, n, k)
 
-    hideInformation(input_image, shares, output)
+    paddingShares = []
+    for share in shares:
+        print(share, len(share))
+
+        if len(share[2:]) % 64 != 0:
+            length = 64 - (len(share[2:]) % 64)
+            share = share[0:2] + '0' * length + share[2:]
+
+        paddingShares.append(share)
+
+    if not os.path.exists("./files/"):
+        os.mkdir("./files/")
+
+    hideInformation(input_image, paddingShares, output)
     os.remove("output")
 
-def getInformation(input_folder): 
+
+def getInformation(input_folder):
     images = []
     for files in os.listdir(input_folder):
         if files.endswith('.png'):
-            images.append(os.path.join(input_folder,files))
+            images.append(os.path.join(input_folder, files))
 
     kkey, data, ivValue, structLen = findInformation(images)
 
-    recoverdKey = recoverSharingKey(kkey)
+    recoverdKey = SecretSharer.recover_secret(kkey)
+
+    if len(recoverdKey) % 64 != 0:
+        length = 64 - (len(recoverdKey) % 64)
+        recoverdKey = '0' * length + recoverdKey
+    recoverdKey = makeKeyFromAscii(recoverdKey)
 
     recvFileName = 'recovered_output.txt'
     decrypt_file(recoverdKey, ivValue, data, structLen, out_filename=recvFileName)
 
-""""""
-
 if __name__ == '__main__':
     # GUI 불러오기
-
-    #steganoGraphy("secret.txt", "sample.png", 5, 3)
-
-    getInformation("./files/")
-
-    """
-    password = make_password()
-    password = password.encode('utf-8')
-
-    key = hashlib.sha256(password).digest()
-
-    print(key)
-    print(makeKeyFromAscii)
-    """
-
-    """
     app = QApplication(sys.argv)
     myWindow = MyWindow()
     myWindow.show()
     myWindow.setFixedSize(800, 700)
     app.exec()
-    """
