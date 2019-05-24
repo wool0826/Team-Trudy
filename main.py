@@ -12,6 +12,9 @@
 # Install utilitybelt
 # python -m pip install utilitybelt
 
+# Install PyQt5
+# python -m pip install PyQt5
+
 ## For Python 3.X User
 ## link: https://github.com/blockstack/secret-sharing
 ## Remove all files in C:\Program Files (x86)\Python37-32\Lib\site-packages\secretsharing
@@ -54,66 +57,26 @@ def makeEncryptFile(in_fname):
     # 파일을 사실 만들 필요는 없음. 메모리에 올리기만 하면 될 것으로 판단됨.
     result = encrypt_file(key, in_fname, out_filename='output')
 
-
     # 반환값은 키값과 output 데이터
     return key, result
-
 
 # key           복호화에 이용할 키
 # in_filename   cipherText에 해당하는 파일의 경로
 # out_filename  plainText에 해당하는 파일의 경로
 # chunkSize     복호화할 때 필요한 chunk Size
 
-# plainText를 생성하는 함수
-def decrypt_file(key, in_filename, out_filename, chunksize=24 * 1024):
-    if not out_filename:
-        out_filename = os.path.splitext(in_filename)[0]
+# plainText를 생성하는 함수(내부에서만 작동가능하다..)
+def decrypt_file(key, iv, in_filename, structLen, out_filename):
+    # 복호화는 CBC모드.
+    decryptor = AES.new(key, AES.MODE_CBC, iv)
+    result = decryptor.decrypt(in_filename)
+    print(structLen)
+    print(result, len(result))
+    print(result[:structLen])
 
-    with open(in_filename, 'rb') as infile:
-        # 이 부분은 잘 모르겠으나.. 처음에 이니셜벡터와 같이 cipherText 맨 앞에 추가된 값을 읽어들임.
-        origsize = struct.unpack('<Q', infile.read(struct.calcsize('Q')))[0]
-        print(type(infile))
-        iv = infile.read(16)
-        print("지금알고싶은것 = ",iv)
-
-
-        # 복호화는 CBC모드.
-        decryptor = AES.new(key, AES.MODE_CBC, iv)
-
-        # chunkSize를 기준으로 파일을 읽어들이고 복호화함.
-        with open(out_filename, 'wb') as outfile:
-            while True:
-                chunk = infile.read(chunksize)
-                if len(chunk) == 0:
-                    break
-                outfile.write(decryptor.decrypt(chunk))
-            outfile.truncate(origsize)
-
-
-# plainText를 생성하는 함수
-def decrypt_file2(key, in_filename, out_filename,chunksize=24 * 1024):
-    if not out_filename:
-        out_filename = os.path.splitext(in_filename)[0]
-
-    with open(in_filename, 'rb') as infile:
-        # 이 부분은 잘 모르겠으나.. 처음에 이니셜벡터와 같이 cipherText 맨 앞에 추가된 값을 읽어들임.
-        origsize = struct.unpack('<Q', infile.read(struct.calcsize('Q')))[0]
-        print(type(infile))
-        iv = infile.read(16)
-
-
-        # 복호화는 CBC모드.
-        decryptor = AES.new(key, AES.MODE_CBC, iv)
-
-        # chunkSize를 기준으로 파일을 읽어들이고 복호화함.
-        with open(out_filename, 'wb') as outfile:
-            while True:
-                chunk = infile.read(chunksize)
-                if len(chunk) == 0:
-                    break
-                outfile.write(decryptor.decrypt(chunk))
-            outfile.truncate(origsize)
-
+    # 파일을 열어서 해독한 내용중 padding된 부분을 제외한 구조길이,structLen만큼만 slicing해서 넣어준다.
+    with open(out_filename, 'wb') as outfile:
+        outfile.write(result[:structLen])
 
 # key           암호화에 이용할 키
 # in_filename   plainText에 해당하는 파일의 경로
@@ -129,11 +92,11 @@ def encrypt_file(key, in_filename, out_filename=None, chunksize=65536):
         out_filename = in_filename + '.enc'
 
     # 암호화에 필요한 값들 초기화
-    iv = Random.new().read( AES.block_size )
+    iv = Random.new().read(AES.block_size)
     encryptor = AES.new(key, AES.MODE_CBC, iv)
     filesize = os.path.getsize(in_filename)
 
-    print('original iv: %s' % iv )
+    print('original iv: %s' % iv)
     print('original struct: %s\n' % struct.pack('<Q', filesize))
 
     with open(in_filename, 'rb') as infile:
@@ -160,10 +123,12 @@ def encrypt_file(key, in_filename, out_filename=None, chunksize=65536):
                 outfile.write(encryptedData)
     return result
 
+
 # 현재 시간에 따른 key seed를 정하는 함수
 def make_password():
     timekey = int(time.time())
     return str(timekey)
+
 
 # Key Sharing Functions
 
@@ -171,37 +136,41 @@ def make_password():
 def makeKeyToAscii(key):
     return binascii.hexlify(bytearray(key)).decode('utf-8')
 
+
 # string형태인 key값을 byteArray형식으로 바꿔주는 함수
 def makeKeyFromAscii(stringKey):
     return binascii.a2b_hex(stringKey)
 
+
 # key값을 n of k 만큼의 sharingKey들로 만들어주는 함수
-def getSharingKey(key, n ,k):
+def getSharingKey(key, n, k):
     return SecretSharer.split_secret(key, k, n)
+
 
 # shares[] = sharingKey들의 배열
 # shares[]들을 이용하여 key값을 복원하는 함수
 def recoverSharingKey(shares):
     return makeKeyFromAscii(SecretSharer.recover_secret(shares))
 
+
 # Steganograpy Functions
 
 # bytesData 형태의 data를 img에 bit단위로 넣어주는 함수
-def insertDataIntoImage(img, bytesData ,length, x, y, channel):
+def insertDataIntoImage(img, bytesData, length, x, y, channel):
     mask = 0xFE
     curr_x = x
     curr_y = y
     pc = channel
 
-    height, width ,c = img.shape
+    height, width, c = img.shape
 
     count = 0
     for elements in bytesData:
         for value in elements:
-            for i in range(0,8):
-                index = 0 if (value & (1 << (7-i))) == 0 else 1
+            for i in range(0, 8):
+                index = 0 if (value & (1 << (7 - i))) == 0 else 1
 
-                img.itemset((curr_y,curr_x,pc), img.item(curr_y, curr_x, pc) & mask | index)
+                img.itemset((curr_y, curr_x, pc), img.item(curr_y, curr_x, pc) & mask | index)
 
                 pc += 1
                 if pc >= c:
@@ -211,13 +180,14 @@ def insertDataIntoImage(img, bytesData ,length, x, y, channel):
                         curr_x = 0
                         curr_y += 1
                         if curr_y >= height:
-                            return 0,0,0 # error
+                            return 0, 0, 0  # error
 
                 count += 1
 
     print('Insert Data Assertion %r' % (count == length))
-                
+
     return curr_x, curr_y, pc
+
 
 # x,y,channel 값을 기준으로 length 길이만큼의 data를 bytesData 형태의 값으로 반환하는 함수.
 def getDataFromImage(img, length, x, y, channel):
@@ -228,7 +198,7 @@ def getDataFromImage(img, length, x, y, channel):
     retrieveData = 0
     data = []
 
-    height, width ,c = img.shape
+    height, width, c = img.shape
 
     count = 0
     for i in range(length):
@@ -242,7 +212,7 @@ def getDataFromImage(img, length, x, y, channel):
                 curr_x = 0
                 curr_y += 1
                 if curr_y >= height:
-                    return 0,0,0 # error
+                    return 0, 0, 0  # error
 
         count += 1
         retrieveData = retrieveData << 1
@@ -252,8 +222,9 @@ def getDataFromImage(img, length, x, y, channel):
             data.append(retrieveData)
             retrieveData = 0
             count = 0
-                
-    return bytes(data), curr_x, curr_y, pc     
+
+    return bytes(data), curr_x, curr_y, pc
+
 
 # 각 데이터의 길이 값을 넣어주는 함수
 # 각 길이는 2^31까지 가능 (32bit)
@@ -264,10 +235,10 @@ def insertLengthIntoImage(img, length, x, y, channel):
     curr_y = y
     pc = channel
 
-    height, width ,c = img.shape
+    height, width, c = img.shape
 
     ## first 32bit for outputlength
-    for i in range(0,32):
+    for i in range(0, 32):
         bit = 0 if (length & index) == 0 else 1
         img.itemset((curr_y, curr_x, pc), img.item(curr_y, curr_x, pc) & mask | bit)
 
@@ -279,24 +250,24 @@ def insertLengthIntoImage(img, length, x, y, channel):
                 curr_x = 0
                 curr_y += 1
                 if curr_y >= height:
-                    return 0,0,0 # error
+                    return 0, 0, 0  # error
 
         index = index >> 1
     return curr_x, curr_y, pc
 
+
 # 각 데이터의 길이 값을 받아오는 함수
 def getLengthFromImage(img, x, y, channel):
-
     retrieveValue = 0
-    height, width ,c = img.shape
+    height, width, c = img.shape
 
     curr_x = x
     curr_y = y
     pc = channel
 
-    for i in range(0,32):
-        value = img.item(curr_y,curr_x,pc) & 1
-    
+    for i in range(0, 32):
+        value = img.item(curr_y, curr_x, pc) & 1
+
         pc += 1
         if pc >= c:
             pc = 0
@@ -305,16 +276,17 @@ def getLengthFromImage(img, x, y, channel):
                 curr_x = 0
                 curr_y += 1
                 if curr_y >= height:
-                    return 0,0,0 # error
+                    return 0, 0, 0  # error
 
         retrieveValue = retrieveValue << 1
         retrieveValue += value
 
     return retrieveValue, curr_x, curr_y, pc
 
+
 # 각 data의 bit수를 세주는 함수
 def countBitLength(share, output):
-    shareLength = 0    
+    shareLength = 0
 
     structSize = len(output[0]) * 8
     ivSize = len(output[1]) * 8
@@ -330,121 +302,90 @@ def countBitLength(share, output):
 # output    cipherText에 해당하는 값
 def hideInformation(fname, shares, output):
     shareLength, structSize, ivSize, dataSize = countBitLength(shares[0], output)
-
     outputLength = structSize + ivSize + dataSize
 
-    print(structSize, ivSize , dataSize   )
-
-    print('original outputLength : %d' % outputLength)
-    print('original shareLength : %d\n' % shareLength)
-    
     img = cv2.imread(fname)
 
-    x,y,c = insertLengthIntoImage(img, outputLength, 0,0,0)         # insert outputLength 32bit
-    x,y,c = insertLengthIntoImage(img, shareLength, x,y,c)          # insert shareLength 32bit
-    px,py,pc = insertDataIntoImage(img, output, outputLength, x,y,c)   # write outputdata
-    
+    x, y, c = insertLengthIntoImage(img, outputLength, 0, 0, 0)  # insert outputLength 32bit
+    x, y, c = insertLengthIntoImage(img, shareLength, x, y, c)  # insert shareLength 32bit
+    px, py, pc = insertDataIntoImage(img, output, outputLength, x, y, c)  # write outputdata
 
     for n, share in enumerate(shares):
         shareArr = []
         shareArr.append(share.encode())
-        #shareArr.append(shares[0].encode())
-        insertDataIntoImage(img, shareArr, shareLength, px,py,pc) # write keySharing Data
+        insertDataIntoImage(img, shareArr, shareLength, px, py, pc)  # write keySharing Data
 
+        cv2.imwrite("image" + str(n) + ".png", img)
 
-        #쉐어키를 이미지에 저장
-        cv2.imwrite("sameple" + str(n) + ".png", img)
-        """
-        cv2.imshow("sameple" + str(n) + ".png",img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-        """
-    return 0
-
-def findInformation(K):
+def findInformation(input_images):
     structSize = 64
     ivSize = 128
-    sharelist=[]
+    sharelist = []
 
-    for n in range(K):
-        img = cv2.imread("sameple" + str(n) + ".png")
+    for imagePath in input_images:
+        img = cv2.imread(imagePath)
 
-        print('')
-
-        outputSize, x,y,c = getLengthFromImage(img, 0,0,0)
-        shareSize, x,y,c = getLengthFromImage(img, x,y,c)
+        outputSize, x, y, c = getLengthFromImage(img, 0, 0, 0)
+        shareSize, x, y, c = getLengthFromImage(img, x, y, c)
 
         dataSize = outputSize - structSize - ivSize
 
-        print('retrieved outputLength : %d' % outputSize)
-        print('retrieved shareLength : %d\n' % shareSize)
+        structValue, x, y, c = getDataFromImage(img, structSize, x, y, c)
+        ivValue, x, y, c = getDataFromImage(img, ivSize, x, y, c)
+        
+        dataValue, x, y, c = getDataFromImage(img, dataSize, x, y, c)
+        shareValue, x, y, c = getDataFromImage(img, shareSize, x, y, c)
 
-        structValue,x,y,c = getDataFromImage(img, structSize, x,y,c)
-        #이니셜 벡터
-        ivValue,x,y,c = getDataFromImage(img, ivSize, x,y,c)
-
-        print('retrieved ivValue : %s' % ivValue)
-        print('retrieved StructValue : %s\n' % structValue)
-
-        #이미지에서 싸이퍼뽑아오는것
-        dataValue,x,y,c = getDataFromImage(img, dataSize, x,y,c)
-
-        #print('retrieved Data : %s\n' % dataValue)
-
-        #쉐어키 뽑아와야됨...
-        shareValue,x,y,c = getDataFromImage(img, shareSize, x,y,c)
-        #print('retrived shareKey : %s\n' %shareValue)
         sharelist.append(shareValue.decode("utf-8"))
+        structLen = int.from_bytes(structValue, byteorder='little')
 
-    return sharelist,dataValue,dataSize
+    return sharelist, dataValue, ivValue, structLen
 
+def steganoGraphy(input_file, input_image, n, k):
+    key, output = makeEncryptFile(input_file)
+    tempkey = makeKeyToAscii(key)
+
+    shares = getSharingKey(tempkey, n, k)
+
+    hideInformation(input_image, shares, output)
+    os.remove("output")
+
+def getInformation(input_folder): 
+    images = []
+    for files in os.listdir(input_folder):
+        if files.endswith('.png'):
+            images.append(os.path.join(input_folder,files))
+
+    kkey, data, ivValue, structLen = findInformation(images)
+
+    recoverdKey = recoverSharingKey(kkey)
+
+    recvFileName = 'recovered_output.txt'
+    decrypt_file(recoverdKey, ivValue, data, structLen, out_filename=recvFileName)
 
 """"""
 
-if __name__ == '__main__':  
+if __name__ == '__main__':
+    # GUI 불러오기
+
+    #steganoGraphy("secret.txt", "sample.png", 5, 3)
+
+    getInformation("./files/")
+
+    """
+    password = make_password()
+    password = password.encode('utf-8')
+
+    key = hashlib.sha256(password).digest()
+
+    print(key)
+    print(makeKeyFromAscii)
+    """
+
+    """
     app = QApplication(sys.argv)
     myWindow = MyWindow()
     myWindow.show()
-    myWindow.setFixedSize(800,700)
+    myWindow.setFixedSize(800, 700)
     app.exec()
-
-    """FILE ENCRYPTION"""
-    """secret.txt를 암호화 key를 생성해서 암호화 한 뒤 key, output으로 반환"""
-    key, output = makeEncryptFile('secret.txt')
-    
-    """KEY SHARING"""
-    """그냥 key값은 keySharing Library에서 쓸 수 없으므로 string형식으로 바꿔준다"""
-    tempkey = makeKeyToAscii(key)
-
-    N = 5
-    K = 3
-
-    """바꾼 key값을 이용하여 N of K 의 keySharing을 수행한다."""
-    shares = getSharingKey(tempkey, N, K)
-
-    print('sharing key', end=' ')
-    print(shares)
-
-
-    """HIDING INFORMATION"""
-    hideInformation("sample.jpg", shares, output)
-
-    """DECRYPT FROM IMAGE"""
-   # findInformation
-    #sharelist = findInformation(N)
-
-    """sharing 복호화? 의 경우에서 코드"""
-    kkey, data, datasize = findInformation(K)
-
-    recoverdKey = recoverSharingKey(kkey)
-    print('original key : %s' % key)
-    print("recovered key: %s\n" % recoverdKey)
-
-    print("data and datasize",data,datasize)
-    print(type(data))
-
-
-    # 지금은 테스트 중이니까 decrypt한 파일도 만들어서 확인
-    recvFileName = 'rec_outpuut.txt'
-    #decrypt_file2(recoverdKey, data,datasize, out_filename=recvFileName)
-    decrypt_file(recoverdKey, in_filename='output', out_filename=recvFileName)
+    """
