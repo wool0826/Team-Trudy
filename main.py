@@ -117,9 +117,9 @@ def encrypt_file(key, in_filename, out_filename=None, chunksize=65536):
                     # 길이가 16bit가 아니면 padding
                     length = 16 - (len(chunk) % 16)
                     chunk += bytes([length]) * length
-
-                result.append(encryptor.encrypt(chunk))
-                outfile.write(encryptor.encrypt(chunk))
+                encryptedData = encryptor.encrypt(chunk)
+                result.append(encryptedData)
+                outfile.write(encryptedData)
     return result
 
 # 현재 시간에 따른 key seed를 정하는 함수
