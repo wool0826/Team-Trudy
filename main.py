@@ -491,7 +491,7 @@ def hideInformation(fname, shares, output):
     shareLength, structSize, ivSize, dataSize = countBitLength(shares[0], output)
     outputLength = structSize + ivSize + dataSize
 
-    img = cv2.imread(fname)
+    img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
 
     x, y, c = insertLengthIntoImage(img, outputLength, 0, 0, 0)  # insert outputLength 32bit
     x, y, c = insertLengthIntoImage(img, shareLength, x, y, c)  # insert shareLength 32bit
@@ -511,7 +511,7 @@ def findInformation(input_images):
     sharelist = []
 
     for imagePath in input_images:
-        img = cv2.imread(imagePath)
+        img = cv2.imread(imagePath, cv2.IMREAD_UNCHANGED)
 
         outputSize, x, y, c = getLengthFromImage(img, 0, 0, 0)
         shareSize, x, y, c = getLengthFromImage(img, x, y, c)
