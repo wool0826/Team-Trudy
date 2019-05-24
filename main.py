@@ -70,9 +70,6 @@ def decrypt_file(key, iv, in_filename, structLen, out_filename):
     # 복호화는 CBC모드.
     decryptor = AES.new(key, AES.MODE_CBC, iv)
     result = decryptor.decrypt(in_filename)
-    print(structLen)
-    print(result, len(result))
-    print(result[:structLen])
 
     # 파일을 열어서 해독한 내용중 padding된 부분을 제외한 구조길이,structLen만큼만 slicing해서 넣어준다.
     with open(out_filename, 'wb') as outfile:
@@ -95,9 +92,6 @@ def encrypt_file(key, in_filename, out_filename=None, chunksize=65536):
     iv = Random.new().read(AES.block_size)
     encryptor = AES.new(key, AES.MODE_CBC, iv)
     filesize = os.path.getsize(in_filename)
-
-    print('original iv: %s' % iv)
-    print('original struct: %s\n' % struct.pack('<Q', filesize))
 
     with open(in_filename, 'rb') as infile:
         with open(out_filename, 'wb') as outfile:
@@ -343,10 +337,19 @@ def findInformation(input_images):
 
 def steganoGraphy(input_file, input_image, n, k):
     key, output = makeEncryptFile(input_file)
+
     tempkey = makeKeyToAscii(key)
 
-    shares = getSharingKey(tempkey, n, k)
+    t = True
 
+    while t != False:
+        t = False
+        shares = getSharingKey(tempkey, n, k)
+
+        for share in shares:
+            if len(share) % 2 != 0:
+                t = True
+                
     hideInformation(input_image, shares, output)
     os.remove("output")
 
@@ -363,14 +366,11 @@ def getInformation(input_folder):
     recvFileName = 'recovered_output.txt'
     decrypt_file(recoverdKey, ivValue, data, structLen, out_filename=recvFileName)
 
-""""""
 
 if __name__ == '__main__':
-    # GUI 불러오기
+    steganoGraphy("secret.txt", "sample.png", 5, 3)
 
-    #steganoGraphy("secret.txt", "sample.png", 5, 3)
-
-    getInformation("./files/")
+    #getInformation("./files/")
 
     """
     password = make_password()
@@ -378,8 +378,19 @@ if __name__ == '__main__':
 
     key = hashlib.sha256(password).digest()
 
-    print(key)
-    print(makeKeyFromAscii)
+    print(type(key))
+    print(key, len(key))
+
+    tempKey = makeKeyToAscii(key)
+
+    print(type(tempKey))
+    print(tempKey, len(key))
+
+    ttempKey = makeKeyFromAscii(tempKey)
+
+    print(type(ttempKey))
+    print(ttempKey, len(ttempKey))
+
     """
 
     """
