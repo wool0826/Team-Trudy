@@ -19,11 +19,25 @@
 ## to C:\Program Files (x86)\Python37-32\Lib\site-packages\secretsharing
 
 import struct, hashlib, time, binascii, os, cv2
+import sys
+import os
+import getpass
 import numpy as np
 
 from secretsharing import SecretSharer
 from Crypto.Cipher import AES
 from Crypto import Random
+from PyQt5.QtWidgets import *
+from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5 import uic
+
+form_class = uic.loadUiType("Trudy 2019.ui")[0]
+
+class MyWindow(QMainWindow, form_class):
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+        self.visible = True
 
 # Crypto Functions
 
@@ -329,6 +343,12 @@ def hideInformation(fname, shares, output):
     return 0
 
 if __name__ == '__main__':  
+
+    app = QApplication(sys.argv)
+    myWindow = MyWindow()
+    myWindow.show()
+    myWindow.setFixedSize(800,700)
+    app.exec()
 
     """FILE ENCRYPTION"""
     """secret.txt를 암호화 key를 생성해서 암호화 한 뒤 key, output으로 반환"""
