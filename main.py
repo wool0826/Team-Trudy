@@ -51,7 +51,6 @@ class MyWindow(QMainWindow, form_class):
         self.edit_folder_path.clicked.connect(self.edit_folder_path_btn_clicked)
         self.encrypto_button.clicked.connect(self.encrypto_start)
 
-
     def edit_text_path_btn_clicked(self):
         defaultPath = self.crypto_text_path.text()
 
@@ -68,6 +67,7 @@ class MyWindow(QMainWindow, form_class):
                 return
             file = open(fname[0])
             self.plaintext.setText(''.join(file.readlines()))
+            self.statusbar.showMessage(" 텍스트 호출 완료.")
         except Exception:
             self.handle_error("텍스트 호출 과정에서 문제가 발생했습니다.")
             return
@@ -109,9 +109,9 @@ class MyWindow(QMainWindow, form_class):
 
             self.image.setPixmap(scaledPixmap)
             self.image.show()
+            self.statusbar.showMessage(" 이미지 호출 완료.")
         except:
             self.handle_error('이미지를 불러올 수 없습니다.')
-
         if(fname[0] is not ''):
             self.crypto_image_path.setText(fname[0])
 
@@ -128,6 +128,8 @@ class MyWindow(QMainWindow, form_class):
         if(fname is not ''):
             self.chiper_image_folder.setText(fname)
 
+        self.statusbar.showMessage(" 이미지 폴더 선택 완료.")
+
     def open_filefolder_btn_clicked(self):
         cwd = os.getcwd()
         os.startfile(cwd)
@@ -142,6 +144,8 @@ class MyWindow(QMainWindow, form_class):
 
         defaultFilePath = self.crypto_text_path.text()
         defaultImagePath = self.crypto_image_path.text()
+
+        self.cypto_progressBar.setValue(10)
 
         msg = ''
         try:
@@ -181,23 +185,34 @@ class MyWindow(QMainWindow, form_class):
             self.handle_error(msg)
             return False, 0, 0, 0, 0
 
+        self.cypto_progressBar.setValue(20)
+
         return True, n, k, defaultFilePath, defaultImagePath
 
 
 
     def crypto_start(self):
 
+        self.cypto_progressBar.setValue(0)
+
         check, n, k, defaultFilePath, defaultImagePath = self.crypto_check()
 
         # 체크를 통과하지 못한경우 종료
         if not check:
             #여기 프로그래스 바 세팅
+            self.statusbar.showMessage(" 설정 값 오류. ")
+            self.cypto_progressBar.setValue(100)
             return
 
         try:
-            steganoGraphy(defaultFilePath, defaultImagePath, n, k)
+            self.cypto_progressBar.setValue(30)
+            steganoGraphy(self, defaultFilePath, defaultImagePath, n, k)
+            self.statusbar.showMessage(" 암호화 성공. ")
+            self.cypto_progressBar.setValue(100)
         except Exception:
             self.handle_error("키쉐어링 암호화 과정에서 문제가 발생했습니다.")
+            self.statusbar.showMessage(" 키쉐어링 암호화 과정에서 문제가 발생했습니다.")
+            self.cypto_progressBar.setValue(100)
             return
 
     def encrypto_check(self):
@@ -209,24 +224,37 @@ class MyWindow(QMainWindow, form_class):
 
     def encrypto_start(self):
 
+        self.encrypto_progress.setValue(0)
+
+
         check, folderpath = self.encrypto_check()
+
+        self.encrypto_progress.setValue(20)
 
         # 체크를 통과하지 못한경우 종료
         if not check:
             #여기 프로그래스 바 세팅
+            self.encrypto_progress.setValue(100)
+            self.statusbar.showMessage(" 설정 값에 문제가 있습니다. ")
             return
 
         try:
-            getInformation(folderpath)
+            getInformation(self, folderpath)
         except Exception:
             self.handle_error("복호화 과정에서 문제가 발생했습니다.")
+            self.statusbar.showMessage(" 복호화 과정에서 문제가 발생했습니다. ")
+            self.encrypto_progress.setValue(100)
             return
 
         try:
-            file = open("recovered_output.txt")
+            file = open("recovered_output0.txt")
             self.plain_text.setText(''.join(file.readlines()))
+            self.statusbar.showMessage(" 복호화 성공. ")
+            self.encrypto_progress.setValue(100)
         except Exception:
             self.handle_error("복호화 텍스트 호출 과정에서 문제가 발생했습니다.")
+            self.statusbar.showMessage(" 복호화 텍스트 호출 과정에서 문제가 발생했습니다.")
+            self.encrypto_progress.setValue(100)
             return
 
 
@@ -487,89 +515,237 @@ def countBitLength(share, output):
 # fname     스테가노그래피에 이용할 원본 이미지의 경로
 # shares    여기서는 1개의 sharingKey만 쓰게 했으나 고치게 될 것으로 보임
 # output    cipherText에 해당하는 값
-def hideInformation(fname, shares, output):
+def hideInformation(self, fname, shares, output, hmac, checksum):
     shareLength, structSize, ivSize, dataSize = countBitLength(shares[0], output)
+
     outputLength = structSize + ivSize + dataSize
 
     img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
 
     x, y, c = insertLengthIntoImage(img, outputLength, 0, 0, 0)  # insert outputLength 32bit
+
+    self.cypto_progressBar.setValue(60)
+
     x, y, c = insertLengthIntoImage(img, shareLength, x, y, c)  # insert shareLength 32bit
+
+    self.cypto_progressBar.setValue(70)
+
     px, py, pc = insertDataIntoImage(img, output, outputLength, x, y, c)  # write outputdata
+
+    self.cypto_progressBar.setValue(80)
 
     for n, share in enumerate(shares):
         shareArr = []
+
         shareArr.append(share.encode())
-        insertDataIntoImage(img, shareArr, shareLength, px, py, pc)  # write keySharing Data
+
+        checkArr = []
+
+        print(n, checksum[n])
+
+        checkArr.append(checksum[n])
+
+        hx, hy, hc = insertDataIntoImage(img, shareArr, shareLength, px, py, pc)  # write keySharing Data
+
+        hx, hy, hc = insertDataIntoImage(img, hmac, 256, hx, hy, hc)
+
+        insertDataIntoImage(img, checkArr, 256, hx, hy, hc)
 
         cv2.imwrite("./files/image" + str(n) + ".png", img)
 
+    # MAC insert.
 
 def findInformation(input_images):
     structSize = 64
+
     ivSize = 128
-    sharelist = []
+
+    shareList = []
+
+    dataList = []
+
+    structLenList = []
+
+    ivValueList = []
+
+    hmacList = []
+
+    checkSumList = []
 
     for imagePath in input_images:
         img = cv2.imread(imagePath, cv2.IMREAD_UNCHANGED)
 
         outputSize, x, y, c = getLengthFromImage(img, 0, 0, 0)
+
         shareSize, x, y, c = getLengthFromImage(img, x, y, c)
 
         dataSize = outputSize - structSize - ivSize
 
         structValue, x, y, c = getDataFromImage(img, structSize, x, y, c)
+
         ivValue, x, y, c = getDataFromImage(img, ivSize, x, y, c)
 
         dataValue, x, y, c = getDataFromImage(img, dataSize, x, y, c)
+
         shareValue, x, y, c = getDataFromImage(img, shareSize, x, y, c)
 
-        sharelist.append(shareValue.decode("utf-8"))
+        hmac, x, y, c = getDataFromImage(img, 256, x, y, c)
+
+        checksum, x, y, c = getDataFromImage(img, 256, x, y, c)
+
         structLen = int.from_bytes(structValue, byteorder='little')
 
-    return sharelist, dataValue, ivValue, structLen
+        dataList.append(dataValue)
+
+        shareList.append(shareValue.decode("utf-8"))
+
+        ivValueList.append(ivValue)
+
+        hmacList.append(hmac)
+
+        structLenList.append(structLen)
+
+        checkSumList.append(checksum)
+
+    # get MAC data
+
+    return shareList, dataList, ivValueList, structLenList, hmacList, checkSumList
 
 
-def steganoGraphy(input_file, input_image, n, k):
+def steganoGraphy(self, input_file, input_image, n, k):
     key, output = makeEncryptFile(input_file)
 
     tempkey = makeKeyToAscii(key)
+
     shares = getSharingKey(tempkey, n, k)
 
     paddingShares = []
+
+    checkSumShares = []
+
     for share in shares:
-        print(share, len(share))
 
         if len(share[2:]) % 64 != 0:
             length = 64 - (len(share[2:]) % 64)
+
             share = share[0:2] + '0' * length + share[2:]
 
         paddingShares.append(share)
 
+        inputData = share.encode() + output[2]
+
+        checkSumShares.append(inputData)
+
+
+    self.cypto_progressBar.setValue(40)
+
     if not os.path.exists("./files/"):
         os.mkdir("./files/")
 
-    hideInformation(input_image, paddingShares, output)
+    hmac = []
+
+    key += output[2]
+
+    hmac.append(hashlib.sha256(key).digest())  # length: 256
+
+    checksum = []
+
+
+    for element in checkSumShares:
+        inputData = element + hmac[0]
+
+        checksum.append(hashlib.sha256(inputData).digest())
+
+    self.cypto_progressBar.setValue(50)
+
+    hideInformation(self, input_image, paddingShares, output, hmac, checksum)
+
+    self.cypto_progressBar.setValue(90)
     os.remove("output")
 
 
-def getInformation(input_folder):
+def getInformation(self, input_folder):
+
     images = []
+
     for files in os.listdir(input_folder):
+
         if files.endswith('.png'):
             images.append(os.path.join(input_folder, files))
 
-    kkey, data, ivValue, structLen = findInformation(images)
+
+    self.encrypto_progress.setValue(30)
+
+    kkey, dataList, ivValueList, structLenList, hmacList, checksum = findInformation(images)
+
+    self.encrypto_progress.setValue(40)
+    removeList = []
+
+    for n, elem in enumerate(checksum):
+
+        temp = hashlib.sha256(kkey[n].encode() + dataList[n] + hmacList[n]).digest()
+
+        # print(n, elem, temp)
+
+        if elem == temp:
+
+            print("%d CheckSum Assertion Success" % n)
+
+        else:
+
+            print("%d CheckSum Assertion Failed" % n)
+
+            removeList.append(n)
+
+    removeList.reverse()
+
+    for i in removeList:
+        del kkey[i]
+
+        del dataList[i]
+
+        del ivValueList[i]
+
+        del structLenList[i]
+
+        del hmacList[i]
+
+        del checksum[i]
 
     recoverdKey = SecretSharer.recover_secret(kkey)
 
+    self.encrypto_progress.setValue(50)
+
     if len(recoverdKey) % 64 != 0:
         length = 64 - (len(recoverdKey) % 64)
+
         recoverdKey = '0' * length + recoverdKey
+
     recoverdKey = makeKeyFromAscii(recoverdKey)
 
-    recvFileName = 'recovered_output.txt'
-    decrypt_file(recoverdKey, ivValue, data, structLen, out_filename=recvFileName)
+    self.encrypto_progress.setValue(60)
+
+    for i in range(0, len(dataList)):
+
+        recvFileName = 'recovered_output' + str(i) + '.txt'
+
+        forHmacTest = recoverdKey + dataList[i]
+
+        hashed = hashlib.sha256(forHmacTest).digest()
+
+        if hmacList[i] == hashed:
+
+            print("%d Assertion Success" % i)
+
+        else:
+
+            print("%d Assertion Failed" % i)
+
+        self.encrypto_progress.setValue(80)
+
+        decrypt_file(recoverdKey, ivValueList[i], dataList[i], structLenList[i], out_filename=recvFileName)
+
+        self.encrypto_progress.setValue(90)
 
 if __name__ == '__main__':
     # GUI 불러오기
