@@ -103,7 +103,7 @@ class MyWindow(QMainWindow, form_class):
             pratio = pwidth / pheight
 
             if ratio < pratio:
-                scaledPixmap = pixmap.scaled(width, width*pratio)
+                scaledPixmap = pixmap.scaled(width, width / pratio)
             else:
                 scaledPixmap = pixmap.scaled(height*pratio, height)
 
